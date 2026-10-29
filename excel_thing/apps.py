@@ -1,6 +1,9 @@
-from django.urls import path
-from .views import index_view
+from django.apps import AppConfig
 
-urlpatterns = [
-    path('', index_view, name='index'),
-]
+class ExcelThingConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'excel_thing'
+
+    def ready(self):
+        # Make sure there are no infinite loops or unhandled blocking calls here
+        pass
