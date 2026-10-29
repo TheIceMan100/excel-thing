@@ -11,7 +11,18 @@ SECRET_KEY = os.environ.get(
 )
 
 # Allowed Hosts for Render
-ALLOWED_HOSTS = [".onrender.com", "localhost", "127.0.0.1"]
+ALLOWED_HOSTS = ['*']
+
+INSTALLED_APPS = [
+    # Default Django contributed apps
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
+    'excel_thing',
+]
 
 # Render provides the external hostname automatically via RENDER_EXTERNAL_HOSTNAME
 RENDER_EXTERNAL_HOSTNAME = os.environ.get("RENDER_EXTERNAL_HOSTNAME")
