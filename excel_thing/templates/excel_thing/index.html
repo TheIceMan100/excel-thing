@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Excel file program sorter looker thing</title>
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw" crossorigin="anonymous"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <main class="app-shell">
+    <header class="page-header">
+      <div class="header-copy">
+        <p class="kicker">Isaac presents:</p>
+        <h1>even Better Excel thing</h1>
+        <p class="subtitle">edna is stressing me out</p>
+      </div>
+      <div class="load-status" aria-live="polite">
+        <span class="status-dot" aria-hidden="true"></span>
+        <span id="statusText">Workbooks here</span>
+      </div>
+    </header>
+
+    <section class="panel upload-panel" aria-labelledby="uploadTitle">
+      <div class="panel-heading">
+        <div>
+          <p class="section-label">Source</p>
+          <h2 id="uploadTitle">Load workbooks</h2>
+        </div>
+        <div>
+          <button id="exportSqlBtn" class="primary-btn" type="button" disabled style="padding: 8px 16px; font-weight: 700; cursor: pointer;">Export Data to SQL</button>
+        </div>
+      </div>
+      
+      <div class="uploads-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <!-- Demand Upload Zone -->
+        <div>
+          <p style="font-size: 0.8rem; font-weight: 800; margin-bottom: 6px; color: #344054;">Demand by Work Center</p>
+          <label class="drop-zone" id="demandDropZone" for="demandFileInput">
+            <span class="drop-icon" aria-hidden="true">DEM</span>
+            <span class="drop-title">Choose Demand file</span>
+            <span class="drop-detail">.xls and .xlsx files</span>
+            <span class="drop-action">Browse file</span>
+          </label>
+          <input class="sr-only" id="demandFileInput" type="file" accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+          <div class="file-meta" id="demandFileMeta" hidden style="grid-template-columns: 1fr;">
+            <div>
+              <span>Loaded Demand File</span>
+              <strong id="demandFileName"></strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- Inventory Upload Zone -->
+        <div>
+          <p style="font-size: 0.8rem; font-weight: 800; margin-bottom: 6px; color: #344054;">Inventory Level</p>
+          <label class="drop-zone" id="inventoryDropZone" for="inventoryFileInput">
+            <span class="drop-icon" aria-hidden="true">INV</span>
+            <span class="drop-title">Choose Inventory file</span>
+            <span class="drop-detail">.xls and .xlsx files</span>
+            <span class="drop-action">Browse file</span>
+          </label>
+          <input class="sr-only" id="inventoryFileInput" type="file" accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+          <div class="file-meta" id="inventoryFileMeta" hidden style="grid-template-columns: 1fr;">
+            <div>
+              <span>Loaded Inventory File</span>
+              <strong id="inventoryFileName"></strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="error-message" id="errorMessage" role="alert" hidden></div>
+    </section>
+
+    <section class="panel controls-panel" aria-labelledby="controlsTitle">
+      <div class="panel-heading">
+        <div>
+          <p class="section-label">Explore</p>
+          <h2 id="controlsTitle">Filter and sort</h2>
+        </div>
+      </div>
+      <div class="controls-grid">
+        <div class="control-group search-group">
+          <label for="materialSearch" id="searchLabel">Search material</label>
+          <input id="materialSearch" type="text" placeholder="Enter material name…" disabled autocomplete="off">
+        </div>
+        <div class="control-group">
+          <label for="sortSelect" id="sortLabel">Sort parts</label>
+          <select id="sortSelect" disabled>
+            <option value="material-asc">Material Number</option>
+            <option value="quantity-desc">Greatest Quantity (Descending)</option>
+            <option value="quantity-asc">Least Quantity (Ascending)</option>
+            <option value="grouped">Group by Work Center</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label for="recordTypeFilter" id="recordTypeLabel">Record type</label>
+          <select id="recordTypeFilter" disabled>
+            <option value="all">All record types</option>
+          </select>
+        </div>
+        <div class="control-group" id="workCenterGroup">
+          <label for="workCenterFilter">Work Center</label>
+          <select id="workCenterFilter" disabled>
+            <option value="all">All Work Centers</option>
+          </select>
+        </div>
+        <div class="control-group date-group" id="dateFromGroup">
+          <label for="startDate">From</label>
+          <input id="startDate" type="date" disabled>
+        </div>
+        <div class="control-group date-group" id="dateToGroup">
+          <label for="endDate">To</label>
+          <input id="endDate" type="date" disabled>
+        </div>
+      </div>
+      <p class="field-error" id="dateError" hidden></p>
+    </section>
+
+    <section class="panel results-panel" aria-labelledby="resultsTitle">
+      <div class="results-top">
+        <div>
+          <p class="section-label">Results</p>
+          <h2 id="resultsTitle">Material quantities</h2>
+        </div>
+        <div class="results-count" id="resultsCount">No data loaded</div>
+      </div>
+
+      <div class="view-toggle" id="viewToggle" hidden>
+        <button class="view-btn is-active" data-view="table" type="button">Table</button>
+        <button class="view-btn" data-view="calendar" type="button">Calendar Availability</button>
+        <button class="view-btn" data-view="grouped" type="button">Grouped by Work Center</button>
+      </div>
+
+      <div class="empty-state" id="emptyState">
+        <div class="empty-icon" aria-hidden="true">↗</div>
+        <h3>Your filtered results will appear here</h3>
+        <p>Load both workbooks above, then choose a date range, sort order, work center, or search for a material.</p>
+      </div>
+
+      <div class="table-wrap" id="tableWrap" hidden>
+        <table>
+          <thead>
+            <tr id="tableHead">
+              <th scope="col">Material Number</th>
+              <th scope="col">Description</th>
+              <th scope="col">Unit</th>
+              <th scope="col">Record Type</th>
+              <th scope="col">Work Center</th>
+              <th scope="col">Calendar Day</th>
+              <th scope="col" class="quantity-header">Quantity</th>
+            </tr>
+          </thead>
+          <tbody id="resultsBody"></tbody>
+        </table>
+      </div>
+
+      <div class="calendar-wrap" id="calendarWrap" hidden>
+        <div class="calendar-summary" id="calendarSummary"></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Material Number</th>
+                <th scope="col">Description</th>
+                <th scope="col">Unit</th>
+                <th scope="col" class="quantity-header">Total Quantity</th>
+                <th scope="col" class="quantity-header">OnHand</th>
+                <th scope="col" class="quantity-header">Difference</th>
+                <th scope="col">Date Range</th>
+              </tr>
+            </thead>
+            <tbody id="calendarBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="grouped-wrap" id="groupedWrap" hidden>
+        <div class="grouped-summary" id="groupedSummary"></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr id="groupedHead">
+                <th scope="col">Work Center</th>
+                <th scope="col">Materials</th>
+                <th scope="col">Total Quantity</th>
+                <th scope="col">Records</th>
+                <th scope="col">Days Active</th>
+                <th scope="col">Date Range</th>
+                <th scope="col">Top Materials</th>
+              </tr>
+            </thead>
+            <tbody id="groupedBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
