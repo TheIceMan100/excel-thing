@@ -1,7 +1,7 @@
 from django.contrib import admin
-from django.urls import path, include  # <-- Make sure 'include' is imported
+from django.urls import path, include
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', include('excel_thing.urls')),  # <-- Routes root requests to your app's URLs
+    path('', include('excel_thing.urls')),
 ]
