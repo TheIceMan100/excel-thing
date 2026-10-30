@@ -3,7 +3,7 @@
 import pandas as pd
 from django.shortcuts import render
 from django.http import JsonResponse
-from .models import DemandRecord
+from .models import DemandRecord, Inventory
 
 def upload_demand_excel_pandas(request):
     if request.method == 'POST' and request.FILES.get('excel_file'):
@@ -51,5 +51,8 @@ def index_view(request):
         "records": demand_records,
         "inventory_count": inventory_items.count(),
     }
-    
-    return render(request, 'excel_thing/index.html', {'demand_records': demand_records})
+
+    return render(request, 'excel_thing/index.html', {
+        'demand_records': demand_records,
+        'inventory_items': inventory_items
+    })
