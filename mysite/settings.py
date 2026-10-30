@@ -39,3 +39,12 @@ if not DEBUG:
     SECURE_HSTS_PRELOAD = True
 
 ROOT_URLCONF = 'mysite.urls'
+
+DATABASES = {
+    'default': dj_database_url.config(
+        # Fallback to local SQLite if DATABASE_URL environment variable is missing
+        default=os.environ.get('DATABASE_URL', 'sqlite:///db.sqlite3'),
+        conn_max_age=600,
+        conn_health_checks=True,
+    )
+}
