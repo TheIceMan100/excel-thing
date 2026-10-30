@@ -1,4 +1,5 @@
 import os
+import dj_database_url
 
 # SECURITY WARNING: Don't run with debug turned on in production!
 # Render sets an environment variable, or you can check if not in local debug
