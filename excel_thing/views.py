@@ -44,11 +44,12 @@ def upload_demand_excel_pandas(request):
 
 def index_view(request):
     # Example view pulling saved records and inventory metrics
-    demand_records = DemandRecord.s.all()[:100]  # Limiting sample display
+    demand_records = DemandRecord.objects.all()[:100]  # Limiting sample display
     inventory_items = Inventory.objects.all()
 
     context = {
         "records": demand_records,
         "inventory_count": inventory_items.count(),
     }
-    return render(request, "mainapp/index.html", context)
+    
+    return render(request, 'excel_thing/index.html', {'demand_records': demand_records})
