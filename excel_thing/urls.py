@@ -1,7 +1,6 @@
-from django.contrib import admin
-from django.urls import path, include
+from django.urls import path
+from .views import index_view  # Or whatever your view name is
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('', include('excel_thing.urls')),
+    path('', index_view, name='index'),  # Must be a list of paths
 ]
