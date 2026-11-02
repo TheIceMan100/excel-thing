@@ -1,5 +1,8 @@
 import os
 import dj_database_url
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: Don't run with debug turned on in production!
 # Render sets an environment variable, or you can check if not in local debug
@@ -15,7 +18,6 @@ SECRET_KEY = os.environ.get(
 ALLOWED_HOSTS = ['*']
 
 INSTALLED_APPS = [
-    # Default Django contributed apps
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -42,10 +44,8 @@ if not DEBUG:
 ROOT_URLCONF = 'mysite.urls'
 
 DATABASES = {
-    'default': dj_database_url.config(
-        # Fallback to local SQLite if DATABASE_URL environment variable is missing
-        default=os.environ.get('DATABASE_URL', 'sqlite:///db.sqlite3'),
-        conn_max_age=600,
-        conn_health_checks=True,
-    )
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+    }
 }
