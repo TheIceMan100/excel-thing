@@ -6,8 +6,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Excel file program sorter looker thing</title>
   <link rel="stylesheet" href="{% static 'excel_thing/css/styles.css' %}">
-  <script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw" crossorigin="anonymous"></script>
-  <script defer src="app.js"></script>
 </head>
 <body>
   <main class="app-shell">
@@ -19,7 +17,7 @@
       </div>
       <div class="load-status" aria-live="polite">
         <span class="status-dot" aria-hidden="true"></span>
-        <span id="statusText">Workbooks here</span>
+        <span id="statusText">Import your workbooks</span>
       </div>
     </header>
 
@@ -33,46 +31,51 @@
           <button id="exportSqlBtn" class="primary-btn" type="button" disabled style="padding: 8px 16px; font-weight: 700; cursor: pointer;">Export Data to SQL</button>
         </div>
       </div>
+
+      {% if messages %}
+        <div class="upload-messages" aria-live="polite">
+          {% for message in messages %}
+            <p class="upload-message {{ message.tags }}">{{ message }}</p>
+          {% endfor %}
+        </div>
+      {% endif %}
       
       <div class="uploads-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
         <!-- Demand Upload Zone -->
         <div>
           <p style="font-size: 0.8rem; font-weight: 800; margin-bottom: 6px; color: #344054;">Demand by Work Center</p>
-          <label class="drop-zone" id="demandDropZone" for="demandFileInput">
-            <span class="drop-icon" aria-hidden="true">DEM</span>
-            <span class="drop-title">Choose Demand file</span>
-            <span class="drop-detail">.xls and .xlsx files</span>
-            <span class="drop-action">Browse file</span>
-          </label>
-          <input class="sr-only" id="demandFileInput" type="file" accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
-          <div class="file-meta" id="demandFileMeta" hidden style="grid-template-columns: 1fr;">
-            <div>
-              <span>Loaded Demand File</span>
-              <strong id="demandFileName"></strong>
-            </div>
-          </div>
+          <form action="{% url 'upload_demand' %}" method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <label class="drop-zone" for="demandFileInput">
+              <span class="drop-icon" aria-hidden="true">DEM</span>
+              <span class="drop-title">Choose Demand file</span>
+              <span class="drop-detail">.xls and .xlsx files</span>
+              <span class="drop-action">Browse file</span>
+            </label>
+            <input class="sr-only" id="demandFileInput" name="excel_file" type="file" accept=".xls,.xlsx" required>
+            <button class="upload-submit" type="submit">Replace demand data</button>
+          </form>
         </div>
 
         <!-- Inventory Upload Zone -->
         <div>
           <p style="font-size: 0.8rem; font-weight: 800; margin-bottom: 6px; color: #344054;">Inventory Level</p>
-          <label class="drop-zone" id="inventoryDropZone" for="inventoryFileInput">
-            <span class="drop-icon" aria-hidden="true">INV</span>
-            <span class="drop-title">Choose Inventory file</span>
-            <span class="drop-detail">.xls and .xlsx files</span>
-            <span class="drop-action">Browse file</span>
-          </label>
-          <input class="sr-only" id="inventoryFileInput" type="file" accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
-          <div class="file-meta" id="inventoryFileMeta" hidden style="grid-template-columns: 1fr;">
-            <div>
-              <span>Loaded Inventory File</span>
-              <strong id="inventoryFileName"></strong>
-            </div>
-          </div>
+          <form action="{% url 'upload_inventory' %}" method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <label class="drop-zone" for="inventoryFileInput">
+              <span class="drop-icon" aria-hidden="true">INV</span>
+              <span class="drop-title">Choose Inventory file</span>
+              <span class="drop-detail">.xls and .xlsx files</span>
+              <span class="drop-action">Browse file</span>
+            </label>
+            <input class="sr-only" id="inventoryFileInput" name="excel_file" type="file" accept=".xls,.xlsx" required>
+            <button class="upload-submit" type="submit">Replace inventory data</button>
+          </form>
         </div>
       </div>
-
-      <div class="error-message" id="errorMessage" role="alert" hidden></div>
+      <p class="upload-counts">
+        Stored demand rows: {{ demand_count }} &middot; Stored inventory materials: {{ inventory_count }}
+      </p>
     </section>
 
     <section class="panel controls-panel" aria-labelledby="controlsTitle">
