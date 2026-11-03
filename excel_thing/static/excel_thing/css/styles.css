@@ -182,22 +182,6 @@ body {
     border: 0;
 }
 
-.upload-submit {
-    margin-top: 0.75rem;
-    padding: 0.55rem 1rem;
-    border: 0;
-    border-radius: 6px;
-    background: var(--primary-color);
-    color: #ffffff;
-    font: inherit;
-    font-weight: 700;
-    cursor: pointer;
-}
-
-.upload-submit:hover {
-    background: var(--primary-hover);
-}
-
 .upload-messages {
     margin-bottom: 1rem;
 }
@@ -215,12 +199,6 @@ body {
 .upload-message.error {
     background: #fef3f2;
     color: #b42318;
-}
-
-.upload-counts {
-    margin-top: 1rem;
-    color: var(--text-muted);
-    font-size: 0.85rem;
 }
 
 /* Controls Grid */

@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Excel file program sorter looker thing</title>
   <link rel="stylesheet" href="{% static 'excel_thing/css/styles.css' %}">
+  <script defer src="{% static 'excel_thing/js/auto_upload.js' %}"></script>
 </head>
 <body>
   <main class="app-shell">
@@ -52,8 +53,7 @@
               <span class="drop-detail">.xls and .xlsx files</span>
               <span class="drop-action">Browse file</span>
             </label>
-            <input class="sr-only" id="demandFileInput" name="excel_file" type="file" accept=".xls,.xlsx" required>
-            <button class="upload-submit" type="submit">Replace demand data</button>
+            <input class="sr-only" id="demandFileInput" name="excel_file" type="file" accept=".xls,.xlsx" data-submit-on-change required>
           </form>
         </div>
 
@@ -68,14 +68,10 @@
               <span class="drop-detail">.xls and .xlsx files</span>
               <span class="drop-action">Browse file</span>
             </label>
-            <input class="sr-only" id="inventoryFileInput" name="excel_file" type="file" accept=".xls,.xlsx" required>
-            <button class="upload-submit" type="submit">Replace inventory data</button>
+            <input class="sr-only" id="inventoryFileInput" name="excel_file" type="file" accept=".xls,.xlsx" data-submit-on-change required>
           </form>
         </div>
       </div>
-      <p class="upload-counts">
-        Stored demand rows: {{ demand_count }} &middot; Stored inventory materials: {{ inventory_count }}
-      </p>
     </section>
 
     <section class="panel controls-panel" aria-labelledby="controlsTitle">
@@ -129,7 +125,9 @@
           <p class="section-label">Results</p>
           <h2 id="resultsTitle">Material quantities</h2>
         </div>
-        <div class="results-count" id="resultsCount">No data loaded</div>
+        <div class="results-count" id="resultsCount">
+          {% if demand_records or inventory_items %}Current imported data{% else %}No data loaded{% endif %}
+        </div>
       </div>
 
       <div class="view-toggle" id="viewToggle" hidden>
@@ -138,13 +136,15 @@
         <button class="view-btn" data-view="grouped" type="button">Grouped by Work Center</button>
       </div>
 
-      <div class="empty-state" id="emptyState">
-        <div class="empty-icon" aria-hidden="true">↗</div>
-        <h3>Your filtered results will appear here</h3>
-        <p>Load both workbooks above, then choose a date range, sort order, work center, or search for a material.</p>
-      </div>
+      {% if not demand_records and not inventory_items %}
+        <div class="empty-state" id="emptyState">
+          <div class="empty-icon" aria-hidden="true">↗</div>
+          <h3>Your imported data will appear here</h3>
+          <p>Import a demand or inventory workbook above to view its data.</p>
+        </div>
+      {% endif %}
 
-      <div class="table-wrap" id="tableWrap" hidden>
+      <div class="table-wrap" id="tableWrap" {% if not demand_records %}hidden{% endif %}>
         <table>
           <thead>
             <tr id="tableHead">
@@ -157,8 +157,52 @@
               <th scope="col" class="quantity-header">Quantity</th>
             </tr>
           </thead>
-          <tbody id="resultsBody"></tbody>
+          <tbody id="resultsBody">
+            {% for record in demand_records %}
+              <tr>
+                <td>{{ record.material }}</td>
+                <td>{{ record.description|default_if_none:"" }}</td>
+                <td>{{ record.unit|default_if_none:"" }}</td>
+                <td>{{ record.record_type }}</td>
+                <td>{{ record.work_center|default_if_none:"" }}</td>
+                <td>{{ record.calendar_day|date:"Y-m-d" }}</td>
+                <td>{{ record.quantity }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
         </table>
+      </div>
+
+      <div class="inventory-results" {% if not inventory_items %}hidden{% endif %}>
+        <h3>Inventory levels</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Class</th>
+                <th scope="col">Item Number</th>
+                <th scope="col">Rev</th>
+                <th scope="col">Description</th>
+                <th scope="col" class="quantity-header">Standard Cost</th>
+                <th scope="col" class="quantity-header">On Hand</th>
+                <th scope="col" class="quantity-header">Non Conform</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in inventory_items %}
+                <tr>
+                  <td>{{ item.item_class }}</td>
+                  <td>{{ item.item_number }}</td>
+                  <td>{{ item.revision }}</td>
+                  <td>{{ item.description }}</td>
+                  <td>{{ item.standard_cost }}</td>
+                  <td>{{ item.on_hand }}</td>
+                  <td>{{ item.non_conform }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <div class="calendar-wrap" id="calendarWrap" hidden>

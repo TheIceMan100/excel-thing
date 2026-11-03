@@ -23,8 +23,15 @@ COLUMN_LABELS = {
     "material": "Material",
     "calendarday": "CalendarDay",
     "quantity": "Quantity",
+    "class": "Class",
+    "itemnumber": "Item Number",
+    "rev": "Rev",
+    "description": "Description",
+    "standardcost": "StandardCost",
     "onhand": "OnHand",
+    "nonconform": "Non Conform",
 }
+HEADER_ALIASES = {"revision": "rev"}
 
 
 def _read_workbook(upload):
@@ -47,6 +54,7 @@ def _normalized_columns(dataframe, required_columns):
     columns = {}
     for column in dataframe.columns:
         normalized = re.sub(r"[^a-z0-9]", "", str(column).casefold())
+        normalized = HEADER_ALIASES.get(normalized, normalized)
         if normalized in columns:
             raise ImportValidationError(
                 f"The workbook has duplicate column names: {column}."
@@ -86,9 +94,13 @@ def _text_value(value, field, row_number, max_length, required=False):
     return value
 
 
-def _decimal_value(value, field, row_number):
+def _decimal_value(value, field, row_number, max_digits=12, decimal_places=2):
+    if _is_blank(value):
+        raise ImportValidationError(f"Row {row_number}: {field} must not be blank.")
     try:
-        return DecimalField(max_digits=12, decimal_places=2).clean(value)
+        return DecimalField(
+            max_digits=max_digits, decimal_places=decimal_places
+        ).clean(value)
     except (InvalidOperation, TypeError, ValidationError, ValueError) as exc:
         raise ImportValidationError(
             f"Row {row_number}: {field} must be a number with at most "
@@ -158,30 +170,69 @@ def _demand_records(upload):
 
 def _inventory_records(upload):
     dataframe = _read_workbook(upload)
-    columns = _normalized_columns(dataframe, ("material", "onhand"))
+    columns = _normalized_columns(
+        dataframe,
+        (
+            "class",
+            "itemnumber",
+            "rev",
+            "description",
+            "standardcost",
+            "onhand",
+            "nonconform",
+        ),
+    )
     records = []
-    seen_materials = set()
 
     for row_number, (_, row) in enumerate(dataframe.iterrows(), start=2):
         if all(_is_blank(value) for value in row):
             continue
-        material = _text_value(
-            row[columns["material"]],
-            "Material",
-            row_number,
-            50,
-            required=True,
-        )
-        if material in seen_materials:
-            raise ImportValidationError(
-                f"Row {row_number}: Material {material} appears more than once."
-            )
-        seen_materials.add(material)
+        item_class = row[columns["class"]]
+        if not _is_blank(item_class):
+            class_label = str(item_class).strip()
+            if (
+                re.match(r"^total for class\b", class_label, re.IGNORECASE)
+                or class_label.casefold() == "grand totals"
+                or re.match(r"^[a-z]:[\\/]", class_label, re.IGNORECASE)
+            ):
+                continue
+
         records.append(
             Inventory(
-                material=material,
+                item_class=_text_value(
+                    item_class, "Class", row_number, 50, required=True
+                ),
+                item_number=_text_value(
+                    row[columns["itemnumber"]],
+                    "Item Number",
+                    row_number,
+                    50,
+                    required=True,
+                ),
+                revision=_text_value(row[columns["rev"]], "Rev", row_number, 50),
+                description=_text_value(
+                    row[columns["description"]], "Description", row_number, 255
+                ),
+                standard_cost=_decimal_value(
+                    row[columns["standardcost"]],
+                    "StandardCost",
+                    row_number,
+                    max_digits=24,
+                    decimal_places=16,
+                ),
                 on_hand=_decimal_value(
-                    row[columns["onhand"]], "OnHand", row_number
+                    row[columns["onhand"]],
+                    "On Hand",
+                    row_number,
+                    max_digits=14,
+                    decimal_places=2,
+                ),
+                non_conform=_decimal_value(
+                    row[columns["nonconform"]],
+                    "Non Conform",
+                    row_number,
+                    max_digits=14,
+                    decimal_places=2,
                 ),
             )
         )
@@ -235,7 +286,7 @@ def index_view(request):
         request,
         "excel_thing/index.html",
         {
-            "demand_count": DemandRecord.objects.count(),
-            "inventory_count": Inventory.objects.count(),
+            "demand_records": DemandRecord.objects.all()[:100],
+            "inventory_items": Inventory.objects.all()[:100],
         },
     )
