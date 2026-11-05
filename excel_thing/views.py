@@ -13,6 +13,7 @@ from xlrd.biffh import XLRDError
 
 from .forms import DemandUploadForm, InventoryUploadForm
 from .models import DemandRecord, Inventory
+from .utils import get_work_center_for_material
 
 
 class ImportValidationError(ValueError):
@@ -34,9 +35,9 @@ COLUMN_LABELS = {
 HEADER_ALIASES = {"revision": "rev"}
 
 
-def _read_workbook(upload):
+def _read_workbook(upload, **read_options):
     try:
-        return pd.read_excel(upload)
+        return pd.read_excel(upload, **read_options)
     except (
         ImportError,
         InvalidFileException,
@@ -102,9 +103,10 @@ def _decimal_value(value, field, row_number, max_digits=12, decimal_places=2):
             max_digits=max_digits, decimal_places=decimal_places
         ).clean(value)
     except (InvalidOperation, TypeError, ValidationError, ValueError) as exc:
+        integer_digits = max_digits - decimal_places
         raise ImportValidationError(
             f"Row {row_number}: {field} must be a number with at most "
-            "10 integer digits and 2 decimal places."
+            f"{integer_digits} integer digits and {decimal_places} decimal places."
         ) from exc
 
 
@@ -118,7 +120,7 @@ def _date_value(value, row_number):
 
 
 def _demand_records(upload):
-    dataframe = _read_workbook(upload)
+    dataframe = _read_workbook(upload, dtype=object)
     columns = _normalized_columns(
         dataframe, ("material", "calendarday", "quantity")
     )
@@ -156,7 +158,11 @@ def _demand_records(upload):
                 else "",
                 calendar_day=_date_value(row[columns["calendarday"]], row_number),
                 quantity=_decimal_value(
-                    row[columns["quantity"]], "Quantity", row_number
+                    row[columns["quantity"]],
+                    "Quantity",
+                    row_number,
+                    max_digits=13,
+                    decimal_places=3,
                 ),
             )
         )
@@ -165,6 +171,131 @@ def _demand_records(upload):
         raise ImportValidationError(
             "The demand workbook must contain at least one data row."
         )
+    return records
+
+
+def _zss_demand_records(upload):
+    dataframe = _read_workbook(upload, header=2, dtype=object)
+    if len(dataframe.columns) < 5:
+        raise ImportValidationError(
+            "The ZSS workbook must include material details and dated quantity columns."
+        )
+
+    normalized_headers = [
+        re.sub(r"[^a-z0-9]", "", str(column).casefold())
+        for column in dataframe.columns[:4]
+    ]
+    if (
+        normalized_headers[0] != "material"
+        or normalized_headers[2] != "unitofmeasure"
+        or normalized_headers[3] != "calendarday"
+    ):
+        raise ImportValidationError(
+            "The ZSS workbook must have Material, Description, Unit of measure, "
+            "and Calendar Day columns in the expected positions."
+        )
+
+    date_columns = []
+    for column_index, column in enumerate(dataframe.columns[4:], start=4):
+        normalized = re.sub(r"[^a-z0-9]", "", str(column).casefold())
+        if normalized == "overallresult":
+            continue
+        try:
+            calendar_day = _date_value(column, 3)
+        except ImportValidationError as exc:
+            raise ImportValidationError(
+                "The ZSS workbook must use dates for quantity column headers "
+                "and may include an Overall Result total column."
+            ) from exc
+        date_columns.append((column_index, calendar_day))
+
+    if not date_columns:
+        raise ImportValidationError(
+            "The ZSS workbook must contain at least one dated quantity column."
+        )
+
+    record_types = {
+        "on-hand stock": "On-Hand Stock",
+        "actual requirements": "Actual Requirements",
+        "open orders": "Open Orders",
+    }
+    records = []
+    for row_number, (_, row) in enumerate(dataframe.iterrows(), start=4):
+        if all(_is_blank(value) for value in row.iloc[:4]) and all(
+            _is_blank(row.iloc[column_index]) for column_index, _ in date_columns
+        ):
+            continue
+
+        material = _text_value(
+            row.iloc[0], "Material", row_number, 50, required=True
+        )
+        description = _text_value(
+            row.iloc[1], "Description", row_number, 255
+        )
+        unit = _text_value(row.iloc[2], "Unit of measure", row_number, 20)
+        raw_record_type = _text_value(
+            row.iloc[3], "Calendar Day", row_number, 50, required=True
+        )
+        normalized_record_type = re.sub(
+            r"\s+", " ", raw_record_type.casefold()
+        )
+        if normalized_record_type not in record_types:
+            raise ImportValidationError(
+                f"Row {row_number}: unsupported ZSS row type "
+                f"{raw_record_type!r}."
+            )
+        record_type = record_types[normalized_record_type]
+        work_center = get_work_center_for_material(material)
+
+        for column_index, calendar_day in date_columns:
+            quantity = row.iloc[column_index]
+            if _is_blank(quantity):
+                continue
+            records.append(
+                DemandRecord(
+                    material=material,
+                    description=description,
+                    unit=unit,
+                    record_type=record_type,
+                    work_center=work_center,
+                    calendar_day=calendar_day,
+                    quantity=_decimal_value(
+                        quantity,
+                        "Quantity",
+                        row_number,
+                        max_digits=13,
+                        decimal_places=3,
+                    ),
+                )
+            )
+
+    if not records:
+        raise ImportValidationError(
+            "The ZSS workbook must contain at least one dated quantity."
+        )
+    return records
+
+
+def _combined_demand_records(demand_center_upload, zss_upload):
+    demand_records = _demand_records(demand_center_upload)
+    try:
+        zss_records = _zss_demand_records(zss_upload)
+    except ImportValidationError as exc:
+        raise ImportValidationError(f"ZSS analysis: {exc}") from exc
+
+    records = []
+    seen = set()
+    for record in [*demand_records, *zss_records]:
+        key = (
+            record.material,
+            record.work_center,
+            record.record_type,
+            record.calendar_day,
+            record.quantity,
+        )
+        if key not in seen:
+            seen.add(key)
+            records.append(record)
     return records
 
 
@@ -270,9 +401,32 @@ def _replace_data(request, form_class, model, record_builder, label):
 
 
 def upload_demand(request):
-    return _replace_data(
-        request, DemandUploadForm, DemandRecord, _demand_records, "Demand"
+    form = DemandUploadForm(request.POST, request.FILES)
+    if not form.is_valid():
+        messages.error(
+            request, f"Demand upload failed: {form.errors.as_text()}"
+        )
+        return redirect("index")
+
+    demand_center_upload = form.cleaned_data["demand_center_file"]
+    zss_upload = form.cleaned_data["zss_analysis_file"]
+    try:
+        records = _combined_demand_records(demand_center_upload, zss_upload)
+    except ImportValidationError as exc:
+        messages.error(request, f"Demand upload failed: {exc}")
+        return redirect("index")
+
+    with transaction.atomic():
+        DemandRecord.objects.all().delete()
+        DemandRecord.objects.bulk_create(records, batch_size=1000)
+
+    row_word = "row" if len(records) == 1 else "rows"
+    messages.success(
+        request,
+        f"Demand data replaced with {len(records)} {row_word} from "
+        f"{demand_center_upload.name} and {zss_upload.name}.",
     )
+    return redirect("index")
 
 
 def upload_inventory(request):

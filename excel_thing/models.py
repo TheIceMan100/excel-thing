@@ -28,7 +28,7 @@ class DemandRecord(models.Model):
     record_type = models.CharField(max_length=50, db_index=True)
     work_center = models.CharField(max_length=50, blank=True, null=True, db_index=True)
     calendar_day = models.DateField()
-    quantity = models.DecimalField(max_digits=12, decimal_places=2)
+    quantity = models.DecimalField(max_digits=13, decimal_places=3)
 
     def __str__(self):
         return f"{self.material} - {self.calendar_day} ({self.quantity})"

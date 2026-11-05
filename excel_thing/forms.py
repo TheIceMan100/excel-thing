@@ -8,8 +8,13 @@ class ExcelUploadForm(forms.Form):
     )
 
 
-class DemandUploadForm(ExcelUploadForm):
-    pass
+class DemandUploadForm(forms.Form):
+    demand_center_file = forms.FileField(
+        validators=[FileExtensionValidator(allowed_extensions=["xls", "xlsx"])]
+    )
+    zss_analysis_file = forms.FileField(
+        validators=[FileExtensionValidator(allowed_extensions=["xls", "xlsx"])]
+    )
 
 
 class InventoryUploadForm(ExcelUploadForm):

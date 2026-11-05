@@ -1,9 +1,11 @@
+from datetime import date
 from decimal import Decimal
 from io import BytesIO
 from pathlib import Path
 from unittest.mock import patch
 
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.middleware.csrf import get_token
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
 from openpyxl import Workbook
@@ -23,6 +25,36 @@ def excel_upload(filename, headers, rows):
     workbook.save(content)
     return SimpleUploadedFile(
         filename,
+        content.getvalue(),
+        content_type=(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        ),
+    )
+
+
+def zss_upload(rows):
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.append(["Supplier Demands"])
+    worksheet.append([])
+    worksheet.append(
+        [
+            "Material",
+            "Description",
+            "Unit of measure",
+            "Calendar Day",
+            "2026-02-03",
+            "2026-02-04",
+            "Overall Result",
+        ]
+    )
+    for row in rows:
+        worksheet.append(row)
+
+    content = BytesIO()
+    workbook.save(content)
+    return SimpleUploadedFile(
+        "zss.xlsx",
         content.getvalue(),
         content_type=(
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -67,16 +99,20 @@ class ExcelImportTests(TestCase):
         )
         content = template_path.read_text()
 
-        self.assertIn('id="demandFileInput"', content)
+        self.assertIn('id="demandCenterFileInput"', content)
+        self.assertIn('id="zssAnalysisFileInput"', content)
+        self.assertIn('data-display-filename="demandCenterFileName"', content)
+        self.assertIn('data-display-filename="zssAnalysisFileName"', content)
         self.assertIn('id="inventoryFileInput"', content)
-        self.assertEqual(content.count("data-submit-on-change"), 2)
+        self.assertEqual(content.count("data-submit-on-change"), 1)
+        self.assertIn("Import both demand files", content)
         self.assertNotIn("Replace demand data", content)
         self.assertNotIn("Replace inventory data", content)
         self.assertNotIn("Stored demand rows", content)
         self.assertNotIn("Stored inventory materials", content)
 
     def test_demand_upload_replaces_demand_only(self):
-        upload = excel_upload(
+        demand_upload = excel_upload(
             "demand.xlsx",
             [
                 "Material",
@@ -89,16 +125,90 @@ class ExcelImportTests(TestCase):
             ],
             [["new-demand", "New part", "EA", "Planned", "WC1", "2026-02-03", 12.5]],
         )
+        report_upload = zss_upload(
+            [
+                [
+                    "report-material",
+                    "Report part",
+                    "Piece",
+                    "On-Hand\nStock",
+                    5,
+                    None,
+                    5,
+                ]
+            ]
+        )
 
-        response = self.client.post(reverse("upload_demand"), {"excel_file": upload})
+        response = self.client.post(
+            reverse("upload_demand"),
+            {
+                "demand_center_file": demand_upload,
+                "zss_analysis_file": report_upload,
+            },
+        )
 
         self.assertRedirects(
             response, reverse("index"), fetch_redirect_response=False
         )
         self.assertFalse(DemandRecord.objects.filter(pk=self.demand.pk).exists())
-        self.assertEqual(DemandRecord.objects.count(), 1)
-        self.assertEqual(DemandRecord.objects.get().material, "new-demand")
+        self.assertEqual(DemandRecord.objects.count(), 2)
+        self.assertEqual(
+            set(DemandRecord.objects.values_list("material", flat=True)),
+            {"new-demand", "report-material"},
+        )
         self.assertTrue(Inventory.objects.filter(pk=self.inventory.pk).exists())
+
+    def test_https_localhost_origin_can_submit_demand_upload(self):
+        client = self.client_class(enforce_csrf_checks=True)
+        host = "localhost:8000"
+        csrf_token = get_token(RequestFactory().get("/"))
+        client.cookies["csrftoken"] = csrf_token
+        demand_upload = excel_upload(
+            "demand.xlsx",
+            [
+                "Material",
+                "Description",
+                "Unit",
+                "Record Type",
+                "Work Center",
+                "Calendar Day",
+                "Quantity",
+            ],
+            [["new-demand", "New part", "EA", "Planned", "WC1", "2026-02-03", 12.5]],
+        )
+        report_upload = zss_upload(
+            [
+                [
+                    "report-material",
+                    "Report part",
+                    "Piece",
+                    "On-Hand\nStock",
+                    5,
+                    None,
+                    5,
+                ]
+            ]
+        )
+
+        response = client.post(
+            reverse("upload_demand"),
+            {
+                "demand_center_file": demand_upload,
+                "zss_analysis_file": report_upload,
+                "csrfmiddlewaretoken": csrf_token,
+            },
+            secure=True,
+            HTTP_HOST=host,
+            HTTP_ORIGIN=f"https://{host}",
+        )
+
+        self.assertRedirects(
+            response, reverse("index"), fetch_redirect_response=False
+        )
+        self.assertEqual(
+            set(DemandRecord.objects.values_list("material", flat=True)),
+            {"new-demand", "report-material"},
+        )
 
     def test_inventory_upload_replaces_inventory_only(self):
         upload = excel_upload(
@@ -142,15 +252,152 @@ class ExcelImportTests(TestCase):
         self.assertTrue(DemandRecord.objects.filter(pk=self.demand.pk).exists())
 
     def test_invalid_demand_upload_preserves_existing_data(self):
-        upload = excel_upload("bad-demand.xlsx", ["Material", "Quantity"], [["new", 2]])
+        demand_upload = excel_upload(
+            "bad-demand.xlsx", ["Material", "Quantity"], [["new", 2]]
+        )
 
-        response = self.client.post(reverse("upload_demand"), {"excel_file": upload})
+        response = self.client.post(
+            reverse("upload_demand"),
+            {
+                "demand_center_file": demand_upload,
+                "zss_analysis_file": zss_upload(
+                    [
+                        [
+                            "report-material",
+                            "Report part",
+                            "Piece",
+                            "On-Hand\nStock",
+                            5,
+                            None,
+                            5,
+                        ]
+                    ]
+                ),
+            },
+        )
 
         self.assertRedirects(
             response, reverse("index"), fetch_redirect_response=False
         )
         self.assertTrue(DemandRecord.objects.filter(pk=self.demand.pk).exists())
         self.assertTrue(Inventory.objects.filter(pk=self.inventory.pk).exists())
+
+    def test_zss_import_includes_all_row_types_and_deduplicates_exact_records(self):
+        demand_upload = excel_upload(
+            "demand.xlsx",
+            [
+                "Material",
+                "Description",
+                "Unit",
+                "Record Type",
+                "Work Center",
+                "Calendar Day",
+                "Quantity",
+            ],
+            [
+                [
+                    "000541",
+                    "CUSHION - CHAIR, LOUNGE",
+                    "Piece",
+                    "Actual Requirements",
+                    "A20",
+                    "2026-02-03",
+                    -7,
+                ]
+            ],
+        )
+        report_upload = zss_upload(
+            [
+                [
+                    "000541",
+                    "CUSHION - CHAIR, LOUNGE",
+                    "Piece",
+                    "On-Hand\nStock",
+                    90,
+                    None,
+                    90,
+                ],
+                [
+                    "000541",
+                    "CUSHION - CHAIR, LOUNGE",
+                    "Piece",
+                    "Actual\nRequirements",
+                    -7,
+                    -0.115,
+                    -7.115,
+                ],
+                [
+                    "000541",
+                    "CUSHION - CHAIR, LOUNGE",
+                    "Piece",
+                    "Open\nOrders",
+                    None,
+                    36,
+                    36,
+                ],
+            ]
+        )
+
+        response = self.client.post(
+            reverse("upload_demand"),
+            {
+                "demand_center_file": demand_upload,
+                "zss_analysis_file": report_upload,
+            },
+        )
+
+        self.assertRedirects(
+            response, reverse("index"), fetch_redirect_response=False
+        )
+        imported = list(
+            DemandRecord.objects.order_by("record_type", "calendar_day")
+        )
+        self.assertEqual(len(imported), 4)
+        self.assertEqual(
+            {
+                (record.record_type, record.calendar_day, record.quantity)
+                for record in imported
+            },
+            {
+                ("On-Hand Stock", date(2026, 2, 3), Decimal("90.00")),
+                ("Actual Requirements", date(2026, 2, 3), Decimal("-7.00")),
+                ("Actual Requirements", date(2026, 2, 4), Decimal("-0.115")),
+                ("Open Orders", date(2026, 2, 4), Decimal("36.00")),
+            },
+        )
+        self.assertTrue(all(record.work_center == "A20" for record in imported))
+
+    def test_invalid_zss_upload_preserves_existing_demand_data(self):
+        demand_upload = excel_upload(
+            "demand.xlsx",
+            [
+                "Material",
+                "Description",
+                "Unit",
+                "Record Type",
+                "Work Center",
+                "Calendar Day",
+                "Quantity",
+            ],
+            [["new-demand", "New part", "EA", "Planned", "WC1", "2026-02-03", 12.5]],
+        )
+        invalid_zss_upload = excel_upload(
+            "invalid-zss.xlsx", ["Material", "Quantity"], [["new", 2]]
+        )
+
+        response = self.client.post(
+            reverse("upload_demand"),
+            {
+                "demand_center_file": demand_upload,
+                "zss_analysis_file": invalid_zss_upload,
+            },
+        )
+
+        self.assertRedirects(
+            response, reverse("index"), fetch_redirect_response=False
+        )
+        self.assertTrue(DemandRecord.objects.filter(pk=self.demand.pk).exists())
+        self.assertEqual(DemandRecord.objects.count(), 1)
 
     def test_inventory_upload_missing_required_column_preserves_existing_data(self):
         upload = excel_upload(
