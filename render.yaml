@@ -10,7 +10,7 @@ services:
     region: ohio
     plan: free
     buildCommand: "./build.sh"
-    startCommand: "gunicorn mysite.wsgi:application"
+    startCommand: "python manage.py clear_imported_data && exec gunicorn mysite.wsgi:application"
     envVars:
       - key: DATABASE_URL
         fromDatabase:

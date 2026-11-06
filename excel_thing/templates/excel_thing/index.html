@@ -12,7 +12,7 @@
   <main class="app-shell">
     <header class="page-header">
       <div class="header-copy">
-        <p class="kicker">Isaac presents:</p>
+        <p class="kicker">This is starting to hurt my head.</p>
         <h1>even Better Excel thing</h1>
         <p class="subtitle">edna is stressing me out</p>
       </div>
@@ -41,35 +41,20 @@
         </div>
       {% endif %}
       
-      <form action="{% url 'upload_demand' %}" method="post" enctype="multipart/form-data">
-        {% csrf_token %}
-        <div class="uploads-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-          <div>
-            <p style="font-size: 0.8rem; font-weight: 800; margin-bottom: 6px; color: #344054;">Demand by Work Center</p>
+      <div class="uploads-grid">
+        <div>
+          <p style="font-size: 0.8rem; font-weight: 800; margin-bottom: 6px; color: #344054;">Demand by Work Center</p>
+          <form action="{% url 'upload_demand' %}" method="post" enctype="multipart/form-data">
+            {% csrf_token %}
             <label class="drop-zone" for="demandCenterFileInput">
               <span class="drop-icon" aria-hidden="true">DEM</span>
               <span class="drop-title">Choose Demand by Work Center file</span>
               <span class="drop-detail">.xls and .xlsx files</span>
               <span class="drop-action" id="demandCenterFileName" data-default-text="Browse file">Browse file</span>
             </label>
-            <input class="sr-only" id="demandCenterFileInput" name="demand_center_file" type="file" accept=".xls,.xlsx" data-display-filename="demandCenterFileName" required>
-          </div>
-          <div>
-            <p style="font-size: 0.8rem; font-weight: 800; margin-bottom: 6px; color: #344054;">ZSS Analysis</p>
-            <label class="drop-zone" for="zssAnalysisFileInput">
-              <span class="drop-icon" aria-hidden="true">ZSS</span>
-              <span class="drop-title">Choose ZSS Analysis file</span>
-              <span class="drop-detail">.xls and .xlsx files</span>
-              <span class="drop-action" id="zssAnalysisFileName" data-default-text="Browse file">Browse file</span>
-            </label>
-            <input class="sr-only" id="zssAnalysisFileInput" name="zss_analysis_file" type="file" accept=".xls,.xlsx" data-display-filename="zssAnalysisFileName" required>
-          </div>
+            <input class="sr-only" id="demandCenterFileInput" name="demand_center_file" type="file" accept=".xls,.xlsx" data-display-filename="demandCenterFileName" data-submit-on-change required>
+          </form>
         </div>
-        <button class="primary-btn" type="submit" style="margin-top: 12px;">Import both demand files</button>
-      </form>
-
-      <div class="uploads-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px;">
-        <!-- Inventory Upload Zone -->
         <div>
           <p style="font-size: 0.8rem; font-weight: 800; margin-bottom: 6px; color: #344054;">Inventory Level</p>
           <form action="{% url 'upload_inventory' %}" method="post" enctype="multipart/form-data">

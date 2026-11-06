@@ -6,7 +6,9 @@ set `CSRF_TRUSTED_ORIGINS` to a comma-separated list of full origins, including
 the scheme (for example, `https://example.com`). On Render, the configured
 external hostname is trusted automatically.
 
-Demand imports require both the Demand by Work Center workbook and the ZSS
-Analysis workbook. The ZSS report's On-Hand Stock, Actual Requirements, and
-Open Orders rows are expanded into dated demand records; duplicate records
-shared by the two workbooks are imported once.
+Demand imports use one Demand by Work Center workbook. It uses the same format
+as a ZSS Analysis workbook regardless of its filename. Its On-Hand Stock,
+Actual Requirements, and Open Orders rows are expanded into dated demand
+records. The app uses `DATABASE_URL` when configured, and clears demand and
+inventory imports from that database before the Render web server starts.
+Django accounts and other application data are not affected.
