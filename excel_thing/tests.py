@@ -7,6 +7,9 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
+from django.contrib.staticfiles.management.commands.runserver import (
+    Command as DjangoRunserverCommand,
+)
 from django.middleware.csrf import get_token
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
@@ -343,6 +346,33 @@ class ExcelImportTests(TestCase):
 
 
 class ClearImportedDataCommandTests(TestCase):
+    @patch.object(DjangoRunserverCommand, "handle")
+    def test_runserver_startup_clears_imported_data(self, runserver_handle):
+        DemandRecord.objects.create(
+            material="startup-demand-marker",
+            record_type="Open Orders",
+            calendar_day="2026-02-03",
+            quantity=1,
+        )
+        Inventory.objects.create(
+            item_class="FG",
+            item_number="startup-inventory-marker",
+            standard_cost=1,
+            on_hand=1,
+            non_conform=0,
+        )
+        user = get_user_model().objects.create_user(
+            username="kept-user", password="unused"
+        )
+        runserver_handle.return_value = ""
+
+        call_command("runserver", verbosity=0)
+
+        self.assertEqual(DemandRecord.objects.count(), 0)
+        self.assertEqual(Inventory.objects.count(), 0)
+        self.assertTrue(get_user_model().objects.filter(pk=user.pk).exists())
+        runserver_handle.assert_called_once()
+
     def test_command_clears_imported_tables_and_preserves_accounts(self):
         DemandRecord.objects.create(
             material="startup-demand-marker",

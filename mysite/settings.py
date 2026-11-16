@@ -23,8 +23,8 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
-    'django.contrib.staticfiles',
     'excel_thing',
+    'django.contrib.staticfiles',
 ]
 
 # Render provides the external hostname automatically via RENDER_EXTERNAL_HOSTNAME

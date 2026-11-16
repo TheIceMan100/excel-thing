@@ -9,6 +9,8 @@ external hostname is trusted automatically.
 Demand imports use one Demand by Work Center workbook. It uses the same format
 as a ZSS Analysis workbook regardless of its filename. Its On-Hand Stock,
 Actual Requirements, and Open Orders rows are expanded into dated demand
-records. The app uses `DATABASE_URL` when configured, and clears demand and
-inventory imports from that database before the Render web server starts.
-Django accounts and other application data are not affected.
+records. Imported inventory and demand records are stored in the configured
+database (`DATABASE_URL` when available). Starting the local Django development
+server clears imported inventory, demand, and legacy inventory records first;
+Render does the same before starting Gunicorn. Django accounts and other
+application data are not affected.
