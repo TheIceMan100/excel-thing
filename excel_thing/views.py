@@ -356,11 +356,27 @@ def upload_inventory(request):
 
 
 def index_view(request):
+    demand_records = list(
+        DemandRecord.objects.order_by("calendar_day", "material", "record_type")
+    )
+    demand_data = [
+        {
+            "material": record.material,
+            "description": record.description or "",
+            "unit": record.unit or "",
+            "record_type": record.record_type,
+            "work_center": record.work_center or "Unknown",
+            "calendar_day": record.calendar_day,
+            "quantity": record.quantity,
+        }
+        for record in demand_records
+    ]
     return render(
         request,
         "excel_thing/index.html",
         {
-            "demand_records": DemandRecord.objects.all()[:100],
+            "demand_records": demand_records,
+            "demand_data": demand_data,
             "inventory_items": Inventory.objects.all()[:100],
         },
     )

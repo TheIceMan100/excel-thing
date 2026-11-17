@@ -100,9 +100,8 @@
         </div>
         <div class="control-group" id="workCenterGroup">
           <label for="workCenterFilter">Work Center</label>
-          <select id="workCenterFilter" disabled>
-            <option value="all">All Work Centers</option>
-          </select>
+          <input id="workCenterFilter" type="search" list="workCenterOptions" placeholder="All work centers" disabled autocomplete="off">
+          <datalist id="workCenterOptions"></datalist>
         </div>
         <div class="control-group date-group" id="dateFromGroup">
           <label for="startDate">From</label>
@@ -154,19 +153,7 @@
               <th scope="col" class="quantity-header">Quantity</th>
             </tr>
           </thead>
-          <tbody id="resultsBody">
-            {% for record in demand_records %}
-              <tr>
-                <td>{{ record.material }}</td>
-                <td>{{ record.description|default_if_none:"" }}</td>
-                <td>{{ record.unit|default_if_none:"" }}</td>
-                <td>{{ record.record_type }}</td>
-                <td>{{ record.work_center|default_if_none:"" }}</td>
-                <td>{{ record.calendar_day|date:"Y-m-d" }}</td>
-                <td>{{ record.quantity }}</td>
-              </tr>
-            {% endfor %}
-          </tbody>
+          <tbody id="resultsBody"></tbody>
         </table>
       </div>
 
@@ -243,5 +230,6 @@
       </div>
     </section>
   </main>
+  {{ demand_data|json_script:"demand-data" }}
 </body>
 </html>

@@ -95,6 +95,41 @@ class ExcelImportTests(TestCase):
         self.assertEqual(list(context["demand_records"]), [self.demand])
         self.assertEqual(list(context["inventory_items"]), [self.inventory])
 
+    @patch("excel_thing.views.render")
+    def test_dashboard_provides_all_demand_records_to_the_views(self, render_mock):
+        DemandRecord.objects.bulk_create(
+            [
+                DemandRecord(
+                    material=f"material-{index}",
+                    record_type="Open Orders",
+                    calendar_day=date(2026, 2, 3),
+                    quantity=1,
+                )
+                for index in range(105)
+            ]
+        )
+
+        index_view(RequestFactory().get(reverse("index")))
+
+        context = render_mock.call_args.args[2]
+        serialized_records = context["demand_data"]
+        self.assertEqual(len(serialized_records), 106)
+        self.assertIn(
+            "material-104", [record["material"] for record in serialized_records]
+        )
+        self.assertEqual(
+            set(serialized_records[0]),
+            {
+                "material",
+                "description",
+                "unit",
+                "record_type",
+                "work_center",
+                "calendar_day",
+                "quantity",
+            },
+        )
+
     def test_dashboard_uploads_submit_on_file_selection_without_extra_controls(self):
         template_path = (
             Path(__file__).parent
